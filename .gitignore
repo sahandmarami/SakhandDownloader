@@ -1,0 +1,15 @@
+# خروجی‌های بیلد
+build/
+.gradle/
+captures/
+
+# تنظیمات محلی (مسیر SDK هر سیستم فرق می‌کند)
+local.properties
+
+# فایل‌های IDE
+.idea/
+*.iml
+.DS_Store
+
+# لاگ‌ها
+*.log
