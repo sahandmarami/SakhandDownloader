@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -30,7 +28,6 @@ import com.sakhand.downloadmanager.engine.DownloadManager
 import com.sakhand.downloadmanager.ui.screens.AboutScreen
 import com.sakhand.downloadmanager.ui.screens.DownloadsScreen
 import com.sakhand.downloadmanager.ui.screens.HomeScreen
-import com.sakhand.downloadmanager.ui.screens.SocialScreen
 import com.sakhand.downloadmanager.ui.theme.BackgroundDark
 import com.sakhand.downloadmanager.ui.theme.Purple
 import com.sakhand.downloadmanager.ui.theme.SurfaceDark
@@ -39,11 +36,10 @@ import kotlinx.coroutines.launch
 
 private data class BottomItem(val route: String, val label: String, val icon: ImageVector)
 
+// رابط ساده با فقط دو تب — «درباره ما» از آیکون بالای صفحه اصلی باز می‌شود
 private val bottomItems = listOf(
     BottomItem("home", "خانه", Icons.Rounded.Home),
-    BottomItem("downloads", "دانلودها", Icons.Rounded.Download),
-    BottomItem("social", "سوشال", Icons.Rounded.SmartDisplay),
-    BottomItem("about", "درباره ما", Icons.Rounded.Info)
+    BottomItem("downloads", "دانلودها", Icons.Rounded.Download)
 )
 
 @Composable
@@ -64,27 +60,29 @@ fun AppRoot() {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = BackgroundDark,
         bottomBar = {
-            NavigationBar(containerColor = SurfaceDark) {
-                bottomItems.forEach { tab ->
-                    NavigationBarItem(
-                        selected = currentRoute == tab.route,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                launchSingleTop = true
-                                popUpTo("home") { saveState = true }
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Purple,
-                            selectedTextColor = Purple,
-                            indicatorColor = Purple.copy(alpha = 0.16f),
-                            unselectedIconColor = TextSecondary,
-                            unselectedTextColor = TextSecondary
+            if (currentRoute != "about") {
+                NavigationBar(containerColor = SurfaceDark) {
+                    bottomItems.forEach { tab ->
+                        NavigationBarItem(
+                            selected = currentRoute == tab.route,
+                            onClick = {
+                                navController.navigate(tab.route) {
+                                    launchSingleTop = true
+                                    popUpTo("home") { saveState = true }
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = { Text(tab.label) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Purple,
+                                selectedTextColor = Purple,
+                                indicatorColor = Purple.copy(alpha = 0.16f),
+                                unselectedIconColor = TextSecondary,
+                                unselectedTextColor = TextSecondary
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -99,17 +97,14 @@ fun AppRoot() {
                     items = items,
                     onMessage = onMessage,
                     onSeeAllDownloads = { navController.navigate("downloads") { launchSingleTop = true } },
-                    onOpenSocial = { navController.navigate("social") { launchSingleTop = true } }
+                    onOpenAbout = { navController.navigate("about") { launchSingleTop = true } }
                 )
             }
             composable("downloads") {
                 DownloadsScreen(items = items)
             }
-            composable("social") {
-                SocialScreen(onMessage = onMessage)
-            }
             composable("about") {
-                AboutScreen()
+                AboutScreen(onBack = { navController.popBackStack() })
             }
         }
     }

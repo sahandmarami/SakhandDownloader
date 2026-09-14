@@ -12,8 +12,8 @@ android {
         applicationId = "com.sakhand.downloadmanager"
         minSdk = 26          // اندروید ۸ به بالا
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     signingConfigs {

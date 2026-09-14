@@ -38,20 +38,20 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * موتور دانلود چندتردی سخند دانلود منیجر
+ * موتور دانلود چندتردی Download Manager
  *
- * - فایل را به ۸ بخش تقسیم و همزمان دانلود می‌کند (اگر سرور پشتیبانی کند)
+ * - فایل را تا ۳۲ بخش تقسیم و همزمان دانلود می‌کند (اگر سرور پشتیبانی کند)
  * - توقف / ادامه / لغو با ذخیره وضعیت بخش‌ها
  * - ادامه دانلود حتی بعد از بسته شدن اپ (فایل‌های .part و وضعیت chunkها روی دیسک)
  */
 object DownloadManager {
 
-    const val THREAD_COUNT = 8
+    const val THREAD_COUNT = 32
     const val USER_AGENT =
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Mobile Safari/537.36"
 
-    private const val BUFFER_SIZE = 64 * 1024
-    private const val MIN_CHUNK_SIZE = 256L * 1024
+    private const val BUFFER_SIZE = 512 * 1024
+    private const val MIN_CHUNK_SIZE = 1024L * 1024
     private const val MIN_CHUNKED_SIZE = 1024L * 1024
     private const val MAX_RETRIES = 5
 

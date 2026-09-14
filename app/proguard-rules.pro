@@ -1,4 +1,4 @@
-# قوانین ProGuard برای سخند دانلود منیجر
+# قوانین ProGuard برای Download Manager
 -keepattributes Signature, InnerClasses, EnclosingMethod
 
 # OkHttp

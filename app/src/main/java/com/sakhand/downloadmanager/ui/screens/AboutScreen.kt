@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Code
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.rounded.DesignServices
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +44,7 @@ import com.sakhand.downloadmanager.ui.theme.TextSecondary
 import com.sakhand.downloadmanager.util.toFa
 
 @Composable
-fun AboutScreen() {
+fun AboutScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,7 +52,21 @@ fun AboutScreen() {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(18.dp))
+        // ردیف بالا با دکمه بازگشت
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "بازگشت",
+                    tint = TextPrimary
+                )
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
 
         // آواتار سازنده با گرادیان برند
         Box(
@@ -67,7 +83,7 @@ fun AboutScreen() {
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("سخند مرامی", style = MaterialTheme.typography.headlineMedium)
+        Text("سهند مرامی", style = MaterialTheme.typography.headlineMedium)
         Text(
             "سازنده و توسعه‌دهنده اپلیکیشن",
             style = MaterialTheme.typography.bodyMedium,
@@ -78,7 +94,7 @@ fun AboutScreen() {
 
         AboutCard(title = "درباره برنامه") {
             Text(
-                "سخند دانلود منیجر یک اپلیکیشن دانلود پرسرعت برای اندروید است که با موتور چندتردی ۸ کاناله، فایل‌ها را چند برابر سریع‌تر از دانلود معمولی مرورگر دریافت می‌کند. توقف و ادامه دانلود حتی بعد از بستن برنامه، اطلاع‌رسانی زنده پیشرفت با نمایش سرعت لحظه‌ای، رابط کاربری کاملاً فارسی با تم تیره مدرن و بخش ویژه دانلود ویدیو از یوتیوب، اینستاگرام و پینترست، تجربه‌ای روان و حرفه‌ای برای شما ساخته است.",
+                "Download Manager یک اپلیکیشن دانلود پرسرعت برای اندروید است که با موتور چندتردی ۳۲ کاناله، فایل‌ها را چند برابر سریع‌تر از دانلود معمولی مرورگر دریافت می‌کند. توقف و ادامه دانلود حتی بعد از بستن برنامه، اطلاع‌رسانی زنده پیشرفت با نمایش سرعت لحظه‌ای و رابط کاربری ساده و کاملاً فارسی، تجربه‌ای روان و حرفه‌ای ساخته‌اند. کافی است هر لینکی — از سایت معمولی یا یوتیوب، اینستاگرام و پینترست — را وارد کنی؛ برنامه خودش نوع لینک را تشخیص می‌دهد.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 textAlign = TextAlign.Justify
@@ -88,7 +104,7 @@ fun AboutScreen() {
         Spacer(Modifier.height(12.dp))
 
         AboutCard(title = "ویژگی‌ها") {
-            FeatureRow(Icons.Rounded.Bolt, "شتاب‌دهی دانلود با ۸ اتصال همزمان")
+            FeatureRow(Icons.Rounded.Bolt, "شتاب‌دهی دانلود با ۳۲ اتصال همزمان")
             FeatureRow(Icons.Rounded.CheckCircle, "توقف و ادامه دانلود در هر لحظه")
             FeatureRow(Icons.Rounded.SmartDisplay, "دانلود ویدیو از یوتیوب، اینستاگرام و پینترست")
             FeatureRow(Icons.Rounded.DesignServices, "رابط کاربری فارسی، راست‌چین و تم تیره")
@@ -98,7 +114,7 @@ fun AboutScreen() {
         Spacer(Modifier.height(12.dp))
 
         AboutCard(title = "اطلاعات نسخه") {
-            InfoRow("نسخه", "۱٫۰٫۰")
+            InfoRow("نسخه", "۱٫۱")
             InfoRow("حداقل اندروید", "۸٫۰ (API ${toFa(26)})")
             InfoRow("موتور دانلود", "چندتردی با OkHttp")
             InfoRow("رابط کاربری", "Jetpack Compose — Material 3")
@@ -106,7 +122,7 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(20.dp))
         Text(
-            "طراحی و توسعه با عشق توسط سخند مرامی",
+            "طراحی و توسعه با عشق توسط سهند مرامی",
             style = MaterialTheme.typography.bodySmall,
             color = Purple
         )
