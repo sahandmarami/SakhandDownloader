@@ -124,7 +124,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text("نسخه برنامه", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
             Spacer(Modifier.weight(1f))
             Text(
-                "۱٫۲",
+                "۱٫۳",
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.textPrimary,
                 fontWeight = FontWeight.Bold

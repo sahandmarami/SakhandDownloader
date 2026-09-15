@@ -121,8 +121,8 @@ app/src/main/java/com/sakhand/downloadmanager/
 
 | خروجی | حجم | کاربرد |
 |---|---|---|
-| `SakhandDownloader-v1.2-release.apk` | ~2.0MB | نصب نهایی — فشرده‌شده با R8، امضاشده |
-| `SakhandDownloader-v1.2-debug.apk` | ~17.6MB | تست و دیباگ |
+| `SakhandDownloader-v1.3-release.apk` | ~2.0MB | نصب نهایی — فشرده‌شده با R8، امضاشده |
+| `SakhandDownloader-v1.3-debug.apk` | ~17.6MB | تست و دیباگ |
 
 برای بیلد مجدد از خط فرمان:
 
