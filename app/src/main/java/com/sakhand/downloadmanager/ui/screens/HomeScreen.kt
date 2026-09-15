@@ -1,5 +1,11 @@
 package com.sakhand.downloadmanager.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +49,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -57,12 +66,10 @@ import com.sakhand.downloadmanager.ui.components.DownloadCard
 import com.sakhand.downloadmanager.ui.components.GradientButton
 import com.sakhand.downloadmanager.ui.components.SectionTitle
 import com.sakhand.downloadmanager.ui.theme.AccentGreen
-import com.sakhand.downloadmanager.ui.theme.BrandGradient
-import com.sakhand.downloadmanager.ui.theme.CardBorder
-import com.sakhand.downloadmanager.ui.theme.CardDark
+import com.sakhand.downloadmanager.ui.theme.AppTheme
+import com.sakhand.downloadmanager.ui.theme.Blue
+import com.sakhand.downloadmanager.ui.theme.BrandGradientColors
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.TextPrimary
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -76,6 +83,7 @@ fun HomeScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    val colors = AppTheme.colors
 
     var url by rememberSaveable { mutableStateOf("") }
     var mode by rememberSaveable { mutableStateOf("1080") } // max / 1080 / 720 / 480 / audio
@@ -85,31 +93,49 @@ fun HomeScreen(
     val platform = remember(url) { SocialDetector.detect(url) }
     val active = items.filter { it.isActive }
 
+    // گرادیان متحرک هدر — درخشش ملایم و همیشگی
+    val shimmer = rememberInfiniteTransition(label = "headerGlow")
+    val shift by shimmer.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "headerShift"
+    )
+    val headerBrush = Brush.linearGradient(
+        colors = BrandGradientColors + Blue.copy(alpha = 0.92f),
+        start = Offset(x = shift * 460f - 140f, y = shift * 120f),
+        end = Offset(x = shift * 460f + 320f, y = 420f - shift * 120f)
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // هدر گرادیانی
+        // هدر گرادیانی متحرک
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(BrandGradient, RoundedCornerShape(24.dp))
-                .padding(horizontal = 18.dp, vertical = 16.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(headerBrush)
+                .padding(horizontal = 18.dp, vertical = 18.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(46.dp)
-                        .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                        .size(48.dp)
+                        .background(Color.White.copy(alpha = 0.2f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Rounded.Download,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
                 Spacer(Modifier.width(12.dp))
@@ -122,7 +148,7 @@ fun HomeScreen(
                     Text(
                         "دانلود سریع فایل و ویدیو",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.85f)
+                        color = Color.White.copy(alpha = 0.88f)
                     )
                 }
                 IconButton(onClick = onOpenAbout) {
@@ -141,26 +167,26 @@ fun HomeScreen(
             value = url,
             onValueChange = { url = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("لینک را اینجا بچسبانید…", color = TextSecondary) },
-            leadingIcon = { Icon(Icons.Rounded.Link, contentDescription = null, tint = TextSecondary) },
+            placeholder = { Text("لینک را اینجا بچسبانید…", color = colors.textSecondary) },
+            leadingIcon = { Icon(Icons.Rounded.Link, contentDescription = null, tint = colors.textSecondary) },
             trailingIcon = {
                 IconButton(onClick = {
                     val text = clipboard.getText()?.toString()
                     if (!text.isNullOrBlank()) url = text.trim()
                 }) {
-                    Icon(Icons.Rounded.ContentPaste, contentDescription = "چسباندن", tint = TextSecondary)
+                    Icon(Icons.Rounded.ContentPaste, contentDescription = "چسباندن", tint = colors.textSecondary)
                 }
             },
             singleLine = true,
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Purple,
-                unfocusedBorderColor = CardBorder,
-                focusedContainerColor = CardDark,
-                unfocusedContainerColor = CardDark,
+                unfocusedBorderColor = colors.cardBorder,
+                focusedContainerColor = colors.card,
+                unfocusedContainerColor = colors.card,
                 cursorColor = Purple,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedTextColor = colors.textPrimary,
+                unfocusedTextColor = colors.textPrimary
             )
         )
 
@@ -182,7 +208,7 @@ fun HomeScreen(
             }
 
             Spacer(Modifier.height(10.dp))
-            Text("کیفیت", style = MaterialTheme.typography.titleMedium)
+            Text("کیفیت", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
             Spacer(Modifier.height(6.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -199,10 +225,10 @@ fun HomeScreen(
                         onClick = { mode = value },
                         label = { Text(label) },
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = CardDark,
+                            containerColor = colors.card,
                             selectedContainerColor = Purple.copy(alpha = 0.3f),
-                            labelColor = TextSecondary,
-                            selectedLabelColor = Color.White
+                            labelColor = colors.textSecondary,
+                            selectedLabelColor = if (colors.isDark) Color.White else Color(0xFF2B1B57)
                         )
                     )
                 }
@@ -275,7 +301,7 @@ fun HomeScreen(
                 Text(
                     "در حال استخراج لینک رسانه…",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = colors.textSecondary
                 )
             }
         }
@@ -297,7 +323,7 @@ fun HomeScreen(
         Text(
             "لینک‌های یوتیوب، اینستاگرام و پینترست خودکار شناسایی می‌شوند — فایل‌ها در پوشه Download ذخیره می‌شوند",
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )

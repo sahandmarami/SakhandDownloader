@@ -28,9 +28,8 @@ import com.sakhand.downloadmanager.data.DownloadItem
 import com.sakhand.downloadmanager.data.DownloadStatus
 import com.sakhand.downloadmanager.ui.components.DownloadCard
 import com.sakhand.downloadmanager.ui.components.EmptyState
-import com.sakhand.downloadmanager.ui.theme.CardDark
+import com.sakhand.downloadmanager.ui.theme.AppTheme
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
 
 @Composable
 fun DownloadsScreen(items: List<DownloadItem>) {
@@ -96,8 +95,8 @@ fun DownloadsScreen(items: List<DownloadItem>) {
 
 @Composable
 private fun chipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = CardDark,
+    containerColor = AppTheme.colors.card,
     selectedContainerColor = Purple.copy(alpha = 0.25f),
-    labelColor = TextSecondary,
-    selectedLabelColor = Color.White
+    labelColor = AppTheme.colors.textSecondary,
+    selectedLabelColor = if (AppTheme.colors.isDark) Color.White else Color(0xFF2B1B57)
 )

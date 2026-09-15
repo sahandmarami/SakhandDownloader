@@ -1,9 +1,9 @@
 package com.sakhand.downloadmanager.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,33 +18,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.DesignServices
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.SmartDisplay
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.sakhand.downloadmanager.ui.theme.AccentGreen
-import com.sakhand.downloadmanager.ui.theme.BrandGradientColors
-import com.sakhand.downloadmanager.ui.theme.CardDark
+import com.sakhand.downloadmanager.R
+import com.sakhand.downloadmanager.ui.theme.AppTheme
+import com.sakhand.downloadmanager.ui.theme.BrandGradient
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.TextPrimary
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
-import com.sakhand.downloadmanager.util.toFa
+import com.sakhand.downloadmanager.ui.theme.ThemeController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val colors = AppTheme.colors
+    val isLight by ThemeController.isLight.collectAsStateWithLifecycle()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +57,6 @@ fun AboutScreen(onBack: () -> Unit) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ردیف بالا با دکمه بازگشت
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -61,66 +65,73 @@ fun AboutScreen(onBack: () -> Unit) {
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "بازگشت",
-                    tint = TextPrimary
+                    tint = colors.textPrimary
                 )
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
 
-        // آواتار سازنده با گرادیان برند
+        // آیکون برنامه
         Box(
             modifier = Modifier
-                .size(96.dp)
-                .background(Brush.linearGradient(BrandGradientColors), CircleShape),
-            contentAlignment = Alignment.Center
+                .size(104.dp)
+                .background(
+                    Brush.linearGradient(listOf(Purple.copy(alpha = 0.25f), Color(0xFF3B82F6).copy(alpha = 0.25f))),
+                    CircleShape
+                )
+                .padding(6.dp)
         ) {
-            Text(
-                "س",
-                style = MaterialTheme.typography.displayMedium,
-                color = TextPrimary
+            Icon(
+                painter = painterResource(R.drawable.ic_app_logo),
+                contentDescription = "آیکون برنامه",
+                tint = Color.Unspecified,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
             )
         }
 
         Spacer(Modifier.height(14.dp))
-        Text("سهند مرامی", style = MaterialTheme.typography.headlineMedium)
+        Text("سهند مرامی", style = MaterialTheme.typography.headlineMedium, color = colors.textPrimary)
         Text(
-            "سازنده و توسعه‌دهنده اپلیکیشن",
+            "سازنده و توسعه‌دهنده برنامه",
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            color = colors.textSecondary
         )
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(24.dp))
 
-        AboutCard(title = "درباره برنامه") {
+        // انتخاب تم
+        Text("تم برنامه", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+        Spacer(Modifier.height(10.dp))
+        ThemeToggle(
+            isLight = isLight,
+            onSelect = { light -> ThemeController.setLight(context, light) }
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        // نسخه
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(colors.card)
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("نسخه برنامه", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+            Spacer(Modifier.weight(1f))
             Text(
-                "Download Manager یک اپلیکیشن دانلود پرسرعت برای اندروید است که با موتور چندتردی ۳۲ کاناله، فایل‌ها را چند برابر سریع‌تر از دانلود معمولی مرورگر دریافت می‌کند. توقف و ادامه دانلود حتی بعد از بستن برنامه، اطلاع‌رسانی زنده پیشرفت با نمایش سرعت لحظه‌ای و رابط کاربری ساده و کاملاً فارسی، تجربه‌ای روان و حرفه‌ای ساخته‌اند. کافی است هر لینکی — از سایت معمولی یا یوتیوب، اینستاگرام و پینترست — را وارد کنی؛ برنامه خودش نوع لینک را تشخیص می‌دهد.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                textAlign = TextAlign.Justify
+                "۱٫۲",
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.textPrimary,
+                fontWeight = FontWeight.Bold
             )
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        AboutCard(title = "ویژگی‌ها") {
-            FeatureRow(Icons.Rounded.Bolt, "شتاب‌دهی دانلود با ۳۲ اتصال همزمان")
-            FeatureRow(Icons.Rounded.CheckCircle, "توقف و ادامه دانلود در هر لحظه")
-            FeatureRow(Icons.Rounded.SmartDisplay, "دانلود ویدیو از یوتیوب، اینستاگرام و پینترست")
-            FeatureRow(Icons.Rounded.DesignServices, "رابط کاربری فارسی، راست‌چین و تم تیره")
-            FeatureRow(Icons.Rounded.Code, "ساخته‌شده با Kotlin و Jetpack Compose")
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        AboutCard(title = "اطلاعات نسخه") {
-            InfoRow("نسخه", "۱٫۱")
-            InfoRow("حداقل اندروید", "۸٫۰ (API ${toFa(26)})")
-            InfoRow("موتور دانلود", "چندتردی با OkHttp")
-            InfoRow("رابط کاربری", "Jetpack Compose — Material 3")
-        }
-
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
             "طراحی و توسعه با عشق توسط سهند مرامی",
             style = MaterialTheme.typography.bodySmall,
@@ -130,62 +141,72 @@ fun AboutScreen(onBack: () -> Unit) {
     }
 }
 
+/**
+ * کلید انتخاب تم — دو حالته روشن / تیره
+ */
 @Composable
-private fun AboutCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(
+private fun ThemeToggle(
+    isLight: Boolean,
+    onSelect: (Boolean) -> Unit
+) {
+    val colors = AppTheme.colors
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CardDark, RoundedCornerShape(20.dp))
-            .padding(18.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(colors.track)
+            .padding(5.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Rounded.Info,
-                contentDescription = null,
-                tint = Purple,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(Modifier.height(12.dp))
-        content()
+        ToggleOption(
+            icon = Icons.Rounded.LightMode,
+            label = "روشن",
+            selected = isLight,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(true) }
+        )
+        ToggleOption(
+            icon = Icons.Rounded.DarkMode,
+            label = "تیره",
+            selected = !isLight,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(false) }
+        )
     }
 }
 
 @Composable
-private fun FeatureRow(icon: ImageVector, text: String) {
+private fun ToggleOption(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = AppTheme.colors
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (selected) BrandGradient else SolidColor(Color.Transparent)
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = AccentGreen,
+            tint = if (selected) Color.White else colors.textSecondary,
             modifier = Modifier.size(18.dp)
         )
-        Spacer(Modifier.width(10.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        Spacer(Modifier.width(8.dp))
         Text(
             label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
-            modifier = Modifier.weight(1f)
+            style = MaterialTheme.typography.titleSmall,
+            color = if (selected) Color.White else colors.textSecondary,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
-        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }

@@ -1,6 +1,7 @@
 package com.sakhand.downloadmanager.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,16 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sakhand.downloadmanager.ui.theme.BrandGradient
-import com.sakhand.downloadmanager.ui.theme.CardDark
-import com.sakhand.downloadmanager.ui.theme.DisabledGradient
+import com.sakhand.downloadmanager.ui.theme.AppTheme
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.TextPrimary
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
 
 /**
  * دکمه گرادیانی اصلی اپ
@@ -44,18 +43,20 @@ fun GradientButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val colors = AppTheme.colors
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (enabled) BrandGradient else DisabledGradient)
+            .background(if (enabled) BrandGradient else SolidColor(colors.track))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            color = if (enabled) Color.White else TextSecondary,
+            color = if (enabled) Color.White else colors.textSecondary,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -94,9 +95,12 @@ fun StatCard(
     label: String,
     modifier: Modifier = Modifier
 ) {
+    val colors = AppTheme.colors
+
     Column(
         modifier = modifier
-            .background(CardDark, RoundedCornerShape(18.dp))
+            .background(colors.card, RoundedCornerShape(18.dp))
+            .border(1.dp, colors.cardBorder, RoundedCornerShape(18.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Icon(
@@ -114,7 +118,7 @@ fun StatCard(
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            color = colors.textSecondary,
             maxLines = 1
         )
     }
@@ -125,6 +129,7 @@ fun StatCard(
  */
 @Composable
 fun EmptyState(message: String) {
+    val colors = AppTheme.colors
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,14 +153,14 @@ fun EmptyState(message: String) {
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary,
+            color = colors.textSecondary,
             textAlign = TextAlign.Center
         )
     }
 }
 
 /**
- * کارت پس‌زمینه تیره با گوشه گرد
+ * کارت پس‌زمینه با گوشه گرد — هماهنگ با تم روشن و تیره
  */
 @Composable
 fun DarkCard(
@@ -163,10 +168,12 @@ fun DarkCard(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val colors = AppTheme.colors
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(CardDark, RoundedCornerShape(20.dp))
+            .background(colors.card, RoundedCornerShape(20.dp))
+            .border(1.dp, colors.cardBorder, RoundedCornerShape(20.dp))
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
             )
@@ -189,7 +196,7 @@ fun GradientAvatar(letter: String, size: androidx.compose.ui.unit.Dp, modifier: 
     ) {
         Text(
             letter,
-            color = TextPrimary,
+            color = Color.White,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )

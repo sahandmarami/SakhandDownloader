@@ -28,10 +28,8 @@ import com.sakhand.downloadmanager.engine.DownloadManager
 import com.sakhand.downloadmanager.ui.screens.AboutScreen
 import com.sakhand.downloadmanager.ui.screens.DownloadsScreen
 import com.sakhand.downloadmanager.ui.screens.HomeScreen
-import com.sakhand.downloadmanager.ui.theme.BackgroundDark
+import com.sakhand.downloadmanager.ui.theme.AppTheme
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.SurfaceDark
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 
 private data class BottomItem(val route: String, val label: String, val icon: ImageVector)
@@ -55,13 +53,14 @@ fun AppRoot() {
     }
 
     val items by DownloadManager.items.collectAsStateWithLifecycle()
+    val colors = AppTheme.colors
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = BackgroundDark,
+        containerColor = colors.background,
         bottomBar = {
             if (currentRoute != "about") {
-                NavigationBar(containerColor = SurfaceDark) {
+                NavigationBar(containerColor = colors.surface) {
                     bottomItems.forEach { tab ->
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
@@ -78,8 +77,8 @@ fun AppRoot() {
                                 selectedIconColor = Purple,
                                 selectedTextColor = Purple,
                                 indicatorColor = Purple.copy(alpha = 0.16f),
-                                unselectedIconColor = TextSecondary,
-                                unselectedTextColor = TextSecondary
+                                unselectedIconColor = colors.textSecondary,
+                                unselectedTextColor = colors.textSecondary
                             )
                         )
                     }

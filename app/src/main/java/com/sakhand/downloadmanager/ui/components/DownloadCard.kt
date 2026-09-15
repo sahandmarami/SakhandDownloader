@@ -3,6 +3,7 @@ package com.sakhand.downloadmanager.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,10 +52,8 @@ import com.sakhand.downloadmanager.ui.theme.AccentAmber
 import com.sakhand.downloadmanager.ui.theme.AccentGreen
 import com.sakhand.downloadmanager.ui.theme.AccentRed
 import com.sakhand.downloadmanager.ui.theme.Blue
-import com.sakhand.downloadmanager.ui.theme.CardDark
+import com.sakhand.downloadmanager.ui.theme.AppTheme
 import com.sakhand.downloadmanager.ui.theme.Purple
-import com.sakhand.downloadmanager.ui.theme.TextSecondary
-import com.sakhand.downloadmanager.ui.theme.TrackGray
 import com.sakhand.downloadmanager.util.formatBytes
 import com.sakhand.downloadmanager.util.formatSpeed
 import com.sakhand.downloadmanager.util.toFa
@@ -65,6 +64,8 @@ import com.sakhand.downloadmanager.util.toFa
 @Composable
 fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
     val context = LocalContext.current
+
+    val colors = AppTheme.colors
 
     val progress = if (item.totalBytes > 0) {
         (item.downloadedBytes.toFloat() / item.totalBytes.toFloat()).coerceIn(0f, 1f)
@@ -81,7 +82,7 @@ fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
         DownloadStatus.PAUSED -> AccentAmber
         DownloadStatus.COMPLETED -> AccentGreen
         DownloadStatus.FAILED -> AccentRed
-        DownloadStatus.CANCELED -> TextSecondary
+        DownloadStatus.CANCELED -> colors.textSecondary
     }
     val icon: ImageVector = when (item.status) {
         DownloadStatus.DOWNLOADING -> Icons.Rounded.Downloading
@@ -112,7 +113,8 @@ fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(CardDark, RoundedCornerShape(20.dp))
+            .background(colors.card, RoundedCornerShape(20.dp))
+            .border(1.dp, colors.cardBorder, RoundedCornerShape(20.dp))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -139,7 +141,7 @@ fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
                     if (item.isSocial && platformLabel != null) "$subtitle — از $platformLabel"
                     else subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
+                    color = colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -189,7 +191,7 @@ fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
                     .height(8.dp)
                     .clip(RoundedCornerShape(6.dp)),
                 color = color,
-                trackColor = TrackGray
+                trackColor = colors.track
             )
         } else {
             LinearProgressIndicator(
@@ -199,7 +201,7 @@ fun DownloadCard(item: DownloadItem, compact: Boolean = false) {
                     .height(8.dp)
                     .clip(RoundedCornerShape(6.dp)),
                 color = color,
-                trackColor = TrackGray
+                trackColor = colors.track
             )
         }
 
@@ -233,7 +235,7 @@ private fun ActionIcon(
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = TextSecondary,
+            tint = AppTheme.colors.textSecondary,
             modifier = Modifier.size(22.dp)
         )
     }

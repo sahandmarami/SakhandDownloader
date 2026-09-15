@@ -10,24 +10,37 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sakhand.downloadmanager.ui.AppRoot
 import com.sakhand.downloadmanager.ui.theme.SakhandTheme
+import com.sakhand.downloadmanager.ui.theme.ThemeController
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT)
-        )
+        ThemeController.load(this)
         requestNeededPermissions()
         setContent {
             // اپ فارسی است؛ چیدمان همیشه راست‌به‌چپ باشد
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                SakhandTheme {
+                val isLight by ThemeController.isLight.collectAsStateWithLifecycle()
+
+                // رنگ نوار وضعیت همیشه هماهنگ با تم فعلی باشد
+                SideEffect {
+                    val style = if (isLight) {
+                        SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+                    }
+                    enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                }
+
+                SakhandTheme(isLight = isLight) {
                     AppRoot()
                 }
             }
