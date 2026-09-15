@@ -13,3 +13,8 @@ local.properties
 
 # لاگ‌ها
 *.log
+
+# Windows build artifacts
+windows/SakhandDm/bin/
+windows/SakhandDm/obj/
+windows/SakhandDm/.avalonia-build-tasks/

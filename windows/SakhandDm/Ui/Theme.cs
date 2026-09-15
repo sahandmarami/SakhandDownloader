@@ -28,6 +28,30 @@ public sealed class AppColors
         Color.Parse("#8B5CF6"), Color.Parse("#3B82F6"), Color.Parse("#EB3B82F6"));
     public IBrush DisabledFill { get; } = new SolidColorBrush(Color.Parse("#334155"));
 
+    /// <summary>آبی وضعیت دانلود — همان Blue اندروید</summary>
+    public IBrush Blue { get; } = SolidColorBrush.Parse("#3B82F6");
+
+    /// <summary>پس‌زمینه چیپ انتخاب‌شده — بنفش ۲۵٪ (مثل FilterChip اندروید)</summary>
+    public IBrush ChipSelectedBg { get; } = SolidColorBrush.Parse("#408B5CF6");
+
+    /// <summary>متن چیپ انتخاب‌شده — در تم روشن بنفش تیره، در تیره سفید (مثل اندروید)</summary>
+    public IBrush ChipSelectedFg => IsDark
+        ? White
+        : SolidColorBrush.Parse("#2B1B57");
+
+    /// <summary>قرص پشت آیکون تب انتخاب‌شده — بنafsh ۱۶٪ (NavigationBarIndicator)</summary>
+    public IBrush NavPill { get; } = SolidColorBrush.Parse("#298B5CF6");
+
+    /// <summary>پس‌زمineh اسnackBar — تیره در هر دو تم (Inverse Surface)</summary>
+    public IBrush SnackBg { get; } = SolidColorBrush.Parse("#F0313033");
+
+    /// <summary>متن خطا در اسنک‌بار</summary>
+    public IBrush SnackErr { get; } = SolidColorBrush.Parse("#FFB4AB");
+
+    /// <summary>حلقه گرادیانی دور آیکون در صفحه درباره (مثل اندروید)</summary>
+    public IBrush RingGradient { get; } = MakeGradient(
+        Color.Parse("#408B5CF6"), Color.Parse("#403B82F6"));
+
     public static IBrush MakeGradient(params Color[] colors)
     {
         var brush = new LinearGradientBrush
