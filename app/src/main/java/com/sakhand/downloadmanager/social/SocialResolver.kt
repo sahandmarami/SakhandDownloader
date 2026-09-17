@@ -31,32 +31,51 @@ data class ResolvedMedia(
  * استخراج لینک مستقیم رسانه از شبکه‌های اجتماعی
  *
  * - پینترست: مستقیم و بدون واسطه (API رسمی صفحه + تحلیل HTML)
- * - یوتیوب و اینستاگرام: از طریق سرویس کوبالت با چند سرور پشتیبان
- *   (اگر سروری از کار افتاد، خودکار سرور بعدی امتحان می‌شود)
+ * - یوتیوب: سرویس کوبالت (چند سرور همزمان) + پشتیبان Piped
+ * - اینستاگرام: کوبالت + زنجیره مستقیم API اینستاگرام برای پست/ریل
+ *   و استوری/هایلایت + پشتیبان GraphQL بدون ورود
+ * - اگر یک مسیر شکست بخورد، خودکار مسیر بعدی امتحان می‌شود
  */
 object SocialResolver {
 
     // ------------------------------------------------------------
     // تنظیمات سرور شخصی (اختیاری)
-    // اگر سرور خودت را راه انداختی (طبق README) اینجا را پر کن
     // ------------------------------------------------------------
     private const val CUSTOM_ENDPOINT = ""
     private const val CUSTOM_API_KEY = ""
 
     /**
-     * لیست سرورهای عمومی کوبالت — به‌صورت «همزمان» امتحان می‌شوند؛
-     * اولین سروری که جواب موفق بدهد برنده است (نیازی به نوبت نیست)
+     * سرورهای عمومی کوبالت — همزمان صدا زده می‌شوند؛
+     * اولین پاسخ موفق برنده است. دو سرور اول تست‌شده و فعال هستند.
      */
     private val cobaltEndpoints = listOf(
         "https://dwnld.nichind.dev/",
+        "https://co.otomir23.me/",
         "https://cobalt-api.kwiatekmiki.com/",
         "https://nyc1.coapi.ggtyler.dev/",
-        "https://cobalt.255.one/",
-        "https://api.dl.ixhby.dev/"
+        "https://cobalt.255.one/"
+    )
+
+    /**
+     * سرورهای پشتیبان Piped برای یوتیوب — وقتی همه سرورهای کوبالت
+     * برای یک ویدیو جواب ندادند (محدودیت یوتیوب روی سرورها)، از این
+     * مسیر مستقل استفاده می‌شود.
+     */
+    private val pipedEndpoints = listOf(
+        "https://api.piped.private.coffee",
+        "https://pipedapi.ducks.party",
+        "https://pipedapi.kavin.rocks",
+        "https://pipedapi.adminforge.de"
     )
 
     private const val MOBILE_UA =
         "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Mobile Safari/537.36"
+
+    // اینستاگرام — شناسه اپلیکیشن وب و User-Agent اپ رسمی
+    private const val IG_APP_ID = "936619743392459"
+    private const val IG_APP_UA =
+        "Instagram 195.0.0.31.123 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; OnePlus5T; op8t19; en_IN; 302733750)"
+    private const val IG_GRAPHQL_DOC = "8845758582119845"
 
     /** کلاینت عمومی برای دریافت صفحات (پینترست) */
     private val client = OkHttpClient.Builder()
@@ -65,11 +84,18 @@ object SocialResolver {
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /** کلاینت سریع برای سرورهای کوبالت — سرور مرده نباید بیش از چند ثانیه معطل کند */
+    /** کلاینت سریع برای سرورهای کوبالت/پایپد — سرور مرده نباید معطل کند */
     private val cobaltClient = OkHttpClient.Builder()
         .connectTimeout(7, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+    /** کلاینت API اینستاگرام — زمان کمی بیشتر برای پاسخ‌های موبایل */
+    private val igClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(18, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
         .build()
 
     suspend fun resolve(
@@ -80,7 +106,29 @@ object SocialResolver {
     ): ResolvedMedia = withContext(Dispatchers.IO) {
         when (platform) {
             SocialPlatform.PINTEREST -> resolvePinterest(link)
-            else -> resolveViaCobalt(link, quality, audioOnly, platform)
+
+            SocialPlatform.YOUTUBE -> {
+                try {
+                    resolveViaCobalt(link, quality, audioOnly, platform)
+                } catch (e: SocialException) {
+                    // پشتیبان Piped فقط برای ویدیو (صدا ندارد)
+                    if (audioOnly) throw e
+                    resolveViaPiped(link) ?: throw e
+                }
+            }
+
+            SocialPlatform.INSTAGRAM -> {
+                if (link.contains("/stories/", ignoreCase = true)) {
+                    resolveInstagramStory(link)
+                } else {
+                    try {
+                        resolveViaCobalt(link, quality, audioOnly, platform)
+                    } catch (e: SocialException) {
+                        if (audioOnly) throw e
+                        resolveInstagramGraph(link) ?: throw e
+                    }
+                }
+            }
         }
     }
 
@@ -408,6 +456,339 @@ object SocialResolver {
             SocialPlatform.PINTEREST -> "pinterest"
         }
         return "${p}_$ts.${if (audioOnly) "m4a" else "mp4"}"
+    }
+
+    // ============================================================
+    // یوتیوب — پشتیبان Piped (مستقل از کوبالت)
+    // ============================================================
+
+    /** استخراج شناسه ۱۱ رقمی ویدیو از انواع لینک یوتیوب */
+    private fun extractVideoId(link: String): String? =
+        Regex("(?:v=|/shorts/|/embed/|/live/|youtu\\.be/|/v/)([A-Za-z0-9_-]{11})")
+            .find(link)?.groupValues?.get(1)
+
+    /**
+     * مسیر پشتیبان یوتیوب از طریق سرورهای Piped.
+     * این سرورها مستقیماً با یوتیوب کار می‌کنند و وقتی کوبالت‌ها
+     * به‌خاطر محدودیت یوتیوب جواب ندهند، همین مسیر جواب می‌دهد.
+     * (حداکثر کیفیت تک‌فایله؛ برای «فقط صدا» مناسب نیست)
+     */
+    private suspend fun resolveViaPiped(link: String): ResolvedMedia? = withContext(Dispatchers.IO) {
+        val videoId = extractVideoId(link) ?: return@withContext null
+        val result = AtomicReference<ResolvedMedia?>(null)
+
+        supervisorScope {
+            pipedEndpoints.map { base ->
+                launch {
+                    runCatching {
+                        val req = Request.Builder()
+                            .url("$base/streams/$videoId")
+                            .header("Accept", "application/json")
+                            .header("User-Agent", MOBILE_UA)
+                            .build()
+
+                        cobaltClient.newCall(req).execute().use { resp ->
+                            if (!resp.isSuccessful) return@use
+                            val json = try {
+                                JSONObject(resp.body?.string() ?: return@use)
+                            } catch (e: Exception) {
+                                return@use
+                            }
+                            if (json.has("error")) return@use
+                            val title = json.optString("title").ifBlank { "youtube_$videoId" }
+                            val streams = json.optJSONArray("videoStreams") ?: return@use
+
+                            var bestRank = 0
+                            var bestUrl: String? = null
+                            for (i in 0 until streams.length()) {
+                                val s = streams.optJSONObject(i) ?: continue
+                                if (s.optBoolean("videoOnly")) continue // فقط تک‌فایله
+                                val url = s.optString("url")
+                                if (url.isBlank() || url.contains(".m3u8")) continue // HLS رد
+                                val qLabel = s.optString("quality")
+                                val height = qLabel.filter { it.isDigit() }.toIntOrNull()
+                                    ?: if (qLabel.equals("LBRY", true) &&
+                                        s.optString("format").contains("MP4", true)) 720 else 0
+                                if (height == 0) continue
+                                val rank = height
+                                if (rank > bestRank) {
+                                    bestRank = rank
+                                    bestUrl = url
+                                }
+                            }
+
+                            bestUrl?.let {
+                                val safe = title.replace(Regex("[\\\\/:*?\"<>|]"), "").trim().take(80)
+                                result.compareAndSet(
+                                    null,
+                                    ResolvedMedia(it, "$safe.mp4", "video/mp4")
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        result.get()
+    }
+
+    // ============================================================
+    // اینستاگرام — استوری و هایلایت از مسیر مستقیم API
+    // ============================================================
+
+    private data class IgStoryTarget(
+        val username: String?,
+        val mediaId: String?,
+        val highlightId: String?
+    )
+
+    private fun parseInstagramStory(link: String): IgStoryTarget {
+        val hl = Regex("/stories/highlights/(\\d+)", RegexOption.IGNORE_CASE)
+            .find(link)?.groupValues?.get(1)
+        val m = Regex("/stories/([A-Za-z0-9_.]+)/?(\\d+)?", RegexOption.IGNORE_CASE)
+            .find(link)
+        val username = m?.groupValues?.get(1)?.takeUnless { it.equals("highlights", true) }
+        val mediaId = m?.groupValues?.get(2)
+        return IgStoryTarget(username, mediaId, hl)
+    }
+
+    /**
+     * زنجیره دانلود استوری/هایلایت اینستاگرام:
+     * ۱) اگر شناسه رسانه در لینک باشد → media/info (دقیق‌ترین)
+     * ۲) هایلایت → reels_media
+     * ۳) نام کاربری → وب‌پروفایل برای شناسه عددی → فید استوری
+     */
+    private suspend fun resolveInstagramStory(link: String): ResolvedMedia = withContext(Dispatchers.IO) {
+        val t = parseInstagramStory(link)
+        val ts = System.currentTimeMillis()
+
+        if (t.mediaId != null) {
+            igMediaInfo(t.mediaId)?.let { return@withContext it }
+        }
+        if (t.highlightId != null) {
+            igHighlight(t.highlightId)?.let { return@withContext it }
+        }
+        if (t.username != null) {
+            val uid = igUserId(t.username)
+            if (uid != null) {
+                igStoryTray(uid, t.username)?.let { return@withContext it }
+            }
+        }
+
+        throw SocialException(
+            "دانلود استوری اینستاگرام ممکن نشد — اینستاگرام دسترسی استوری‌ها را برای ابزارهای خارجی " +
+                "به‌شدت محدود کرده است. اگر حساب خصوصی است یا استوری منقضی شده، قابل دانلود نیست. " +
+                "برای ویدیوهای معمولی از لینک پست یا ریل استفاده کن."
+        )
+    }
+
+    /** اطلاعات یک رسانه با شناسه عددی (کار می‌کند برای لینک استوری دارای شناسه) */
+    private fun igMediaInfo(mediaId: String): ResolvedMedia? = runCatching {
+        val req = igRequest("https://i.instagram.com/api/v1/media/$mediaId/info/")
+        igClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val json = JSONObject(resp.body?.string() ?: return null)
+            val item = json.optJSONArray("items")?.optJSONObject(0) ?: return null
+            val user = item.optJSONObject("user")?.optString("username").orEmpty()
+            igPickMedia(item, "instagram_story_${user.ifBlank { mediaId }}.mp4")
+        }
+    }.getOrNull()
+
+    /** آیتم‌های یک هایلایت */
+    private fun igHighlight(highlightId: String): ResolvedMedia? = runCatching {
+        val req = igRequest("https://i.instagram.com/api/v1/feed/reels_media/?media_ids=$highlightId")
+        igClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val json = JSONObject(resp.body?.string() ?: return null)
+            val reels = json.optJSONObject("reels") ?: return null
+            val keys = reels.keys()
+            if (!keys.hasNext()) return null
+            val reel = reels.optJSONObject(keys.next()) ?: return null
+            val items = reel.optJSONArray("items") ?: return null
+            for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                igPickMedia(item, "instagram_highlight_$highlightId.mp4")?.let { return it }
+            }
+            null
+        }
+    }.getOrNull()
+
+    /** شناسه عددی کاربر از روی نام کاربری (وب‌پروفایل) */
+    private fun igUserId(username: String): String? {
+        // اول با UA موبایل اپ، بعد با UA مرورگر — بعضی IPها فقط یکی را می‌پذیرند
+        val urls = listOf(
+            "https://i.instagram.com/api/v1/users/web_profile_info/?username=$username",
+            "https://www.instagram.com/api/v1/users/web_profile_info/?username=$username"
+        )
+        for ((idx, u) in urls.withIndex()) {
+            runCatching {
+                val req = Request.Builder()
+                    .url(u)
+                    .header("User-Agent", if (idx == 0) IG_APP_UA else MOBILE_UA)
+                    .header("X-IG-App-ID", IG_APP_ID)
+                    .header("Accept", "application/json")
+                    .build()
+                igClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return null
+                    val json = JSONObject(resp.body?.string() ?: return null)
+                    val id = json.optJSONObject("data")?.optJSONObject("user")?.optString("id")
+                    if (!id.isNullOrBlank()) return id
+                    null
+                }
+            }
+        }
+        return null
+    }
+
+    /** فید استوری فعلی یک کاربر — اولین ویدیوی موجود برمی‌گردد */
+    private fun igStoryTray(userId: String, username: String): ResolvedMedia? = runCatching {
+        val req = igRequest("https://i.instagram.com/api/v1/feed/user/$userId/story/")
+        igClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val json = JSONObject(resp.body?.string() ?: return null)
+            val tray = json.optJSONArray("tray") ?: json.optJSONArray("items") ?: return null
+            for (i in 0 until tray.length()) {
+                val entry = tray.optJSONObject(i) ?: continue
+                val items = entry.optJSONArray("items") ?: continue
+                for (j in 0 until items.length()) {
+                    val item = items.optJSONObject(j) ?: continue
+                    igPickMedia(item, "instagram_story_$username.mp4")?.let { return it }
+                }
+            }
+            null
+        }
+    }.getOrNull()
+
+    /**
+     * از یک آیتم اینستاگرام بهترین ویدیو (و در نبودش، عکس) را برمی‌گرداند.
+     * video_versions بر اساس کیفیت مرتب نیستند — بهترین را بر اساس عرض انتخاب می‌کنیم.
+     */
+    private fun igPickMedia(item: JSONObject, fileName: String): ResolvedMedia? {
+        val videos = item.optJSONArray("video_versions")
+        if (videos != null && videos.length() > 0) {
+            var bestW = -1
+            var bestUrl: String? = null
+            for (i in 0 until videos.length()) {
+                val v = videos.optJSONObject(i) ?: continue
+                val url = v.optString("url")
+                if (url.isBlank()) continue
+                val w = v.optInt("width", 0)
+                if (w > bestW) {
+                    bestW = w
+                    bestUrl = url
+                }
+            }
+            bestUrl?.let { return ResolvedMedia(it, fileName, "video/mp4") }
+        }
+        // عکس استوری
+        val candidates = item.optJSONObject("image_versions2")
+            ?.optJSONArray("candidates") ?: return null
+        var bestW = -1
+        var bestUrl: String? = null
+        for (i in 0 until candidates.length()) {
+            val c = candidates.optJSONObject(i) ?: continue
+            val url = c.optString("url")
+            if (url.isBlank()) continue
+            val w = c.optInt("width", 0)
+            if (w > bestW) {
+                bestW = w
+                bestUrl = url
+            }
+        }
+        return bestUrl?.let {
+            ResolvedMedia(it, fileName.replace(".mp4", ".jpg"), "image/jpeg")
+        }
+    }
+
+    /** درخواست استاندارد API موبایل اینستاگرام */
+    private fun igRequest(url: String): Request = Request.Builder()
+        .url(url)
+        .header("User-Agent", IG_APP_UA)
+        .header("X-IG-App-ID", IG_APP_ID)
+        .header("Accept", "application/json")
+        .build()
+
+    // ============================================================
+    // اینستاگرام — پشتیبان GraphQL بدون ورود (پست و ریل)
+    // ============================================================
+
+    /**
+     * وقتی کوبالت‌ها شکست خوردند، مستقیم از GraphQL وب اینستاگرام
+     * رسانه را بیرون می‌کشیم. از IPهای خانگی/موبایل معمولاً پاسخ می‌دهد.
+     */
+    private suspend fun resolveInstagramGraph(link: String): ResolvedMedia? = withContext(Dispatchers.IO) {
+        val shortcode = Regex("/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", RegexOption.IGNORE_CASE)
+            .find(link)?.groupValues?.get(1) ?: return@withContext null
+
+        runCatching {
+            val form = "variables=" + URLEncoder.encode(
+                JSONObject().put("shortcode", shortcode).toString(), "UTF-8"
+            ) + "&doc_id=" + IG_GRAPHQL_DOC
+
+            val request = Request.Builder()
+                .url("https://www.instagram.com/graphql/query")
+                .header("User-Agent", MOBILE_UA)
+                .header("X-IG-App-ID", IG_APP_ID)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Accept", "*/*")
+                .header("Referer", "https://www.instagram.com/")
+                .post(form.toRequestBody("application/x-www-form-urlencoded".toMediaType()))
+                .build()
+
+            igClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val json = JSONObject(resp.body?.string() ?: return@use null)
+                val media = json.optJSONObject("data")
+                    ?.optJSONObject("xdt_shortcode_media") ?: return@use null
+
+                if (media.optBoolean("is_video")) {
+                    // GraphQL ممکن است video_url مستقیم بدهد یا آرایه video_versions
+                    val url = media.optString("video_url").takeIf { it.isNotBlank() }
+                        ?: pickBestIgVersion(media.optJSONArray("video_versions"))
+                    if (url != null) {
+                        return@use ResolvedMedia(url, "instagram_$shortcode.mp4", "video/mp4")
+                    }
+                }
+                // پست چندتایی (sidecar) — اولین ویدیو یا عکس داخل فرزندان
+                val edges = media.optJSONObject("edge_sidecar_to_children")
+                    ?.optJSONArray("edges")
+                if (edges != null) {
+                    for (i in 0 until edges.length()) {
+                        val child = edges.optJSONObject(i)?.optJSONObject("node") ?: continue
+                        if (child.optBoolean("is_video")) {
+                            val url = child.optString("video_url").takeIf { it.isNotBlank() }
+                                ?: pickBestIgVersion(child.optJSONArray("video_versions"))
+                            if (url != null) {
+                                return@use ResolvedMedia(url, "instagram_$shortcode.mp4", "video/mp4")
+                            }
+                        }
+                    }
+                }
+                // عکس پست
+                val display = media.optString("display_url").takeIf { it.isNotBlank() }
+                    ?: media.optString("thumbnail_src").takeIf { it.isNotBlank() }
+                display?.let { ResolvedMedia(it, "instagram_$shortcode.jpg", "image/jpeg") }
+            }
+        }.getOrNull()
+    }
+
+    /** بهترین نسخه از آرایه video_versions (بیشترین عرض) */
+    private fun pickBestIgVersion(versions: JSONArray?): String? {
+        if (versions == null) return null
+        var bestW = -1
+        var bestUrl: String? = null
+        for (i in 0 until versions.length()) {
+            val v = versions.optJSONObject(i) ?: continue
+            val url = v.optString("url")
+            if (url.isBlank()) continue
+            val w = v.optInt("width", 0)
+            if (w > bestW) {
+                bestW = w
+                bestUrl = url
+            }
+        }
+        return bestUrl
     }
 
     // ------------------------------------------------------------
