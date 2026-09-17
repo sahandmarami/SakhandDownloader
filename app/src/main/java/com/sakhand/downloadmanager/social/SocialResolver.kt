@@ -58,25 +58,20 @@ object SocialResolver {
 
     /** لیست داخلی — وقتی تنظیمات ریموت در دسترس نباشد استفاده می‌شود */
     private val bundledCobalt = listOf(
+        "https://api.cobalt.liubquanti.click/",
         "https://co.otomir23.me/",
-        "https://dwnld.nichind.dev/",
-        "https://cobalt-api.kwiatekmiki.com/",
-        "https://nyc1.coapi.ggtyler.dev/",
-        "https://cobalt.255.one/"
+        "https://dwnld.nichind.dev/"
     )
 
     private val bundledPiped = listOf(
         "https://api.piped.private.coffee",
-        "https://pipedapi.ducks.party",
-        "https://pipedapi.kavin.rocks",
-        "https://pipedapi.adminforge.de"
+        "https://pipedapi.ducks.party"
     )
 
     private val bundledInvidious = listOf(
         "https://inv.nadeko.net",
         "https://yewtu.be",
-        "https://invidious.f5.si",
-        "https://invidious.private.coffee"
+        "https://invidious.f5.si"
     )
 
     private const val MOBILE_UA =
@@ -99,11 +94,11 @@ object SocialResolver {
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /** کلاینت سریع برای سرورهای کوبالت/پایپد — سرور مرده نباید معطل کند */
+    /** کلاینت سریع برای سرورهای کوبالت/پایپد — شبکه‌های موبایل آهسته‌اند */
     private val cobaltClient = OkHttpClient.Builder()
-        .connectTimeout(7, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
         .build()
 
     /** کلاینت API اینستاگرام — زمان کمی بیشتر برای پاسخ‌های موبایل */
@@ -336,6 +331,40 @@ object SocialResolver {
                             if (audioOnly) "audio/mp4" else "video/mp4"
                         }
                         Attempt(media = ResolvedMedia(url, filename, mime))
+                    }
+                    "picker" -> {
+                        // پست چندرسانه‌ای — اولین ویدیو، وگرنه اولین عکس
+                        val items = json.optJSONArray("picker")
+                        var picked: JSONObject? = null
+                        if (items != null) {
+                            for (i in 0 until items.length()) {
+                                val entry = items.optJSONObject(i) ?: continue
+                                val eUrl = entry.optString("url")
+                                if (eUrl.isBlank()) continue
+                                if (entry.optString("type").equals("video", true)) {
+                                    picked = entry
+                                    break
+                                }
+                                if (picked == null) picked = entry
+                            }
+                        }
+                        val pUrl = picked?.optString("url")
+                        if (pUrl.isNullOrBlank()) {
+                            Attempt(reason = "هیچ رسانه‌ای در پست پیدا نشد")
+                        } else {
+                            val isVideo = picked.optString("type").equals("video", true)
+                            val name = json.optString("filename").ifBlank {
+                                val ts = System.currentTimeMillis()
+                                if (isVideo) "instagram_$ts.mp4" else "instagram_$ts.jpg"
+                            }
+                            Attempt(
+                                media = ResolvedMedia(
+                                    pUrl,
+                                    name,
+                                    if (isVideo) "video/mp4" else "image/jpeg"
+                                )
+                            )
+                        }
                     }
                     "local-processing" -> Attempt(localProcessing = true)
                     "error" -> Attempt(reason = errorFa(json))
