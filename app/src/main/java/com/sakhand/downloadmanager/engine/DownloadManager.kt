@@ -57,6 +57,19 @@ object DownloadManager {
 
     private lateinit var appContext: Context
     private lateinit var client: OkHttpClient
+
+    /** کلاینت جایگزین برای عبور از خطای گواهی TLS (ساعت اشتباه دستگاه یا دستکاری میانه) */
+    private val lenientClient: OkHttpClient by lazy {
+        LenientTls.apply(
+            OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(45, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .dns(SmartDns)
+                .build()
+        )
+    }
     private lateinit var partsDir: File
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -79,6 +92,7 @@ object DownloadManager {
             .readTimeout(45, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
+            .dns(SmartDns)
             .build()
         loadPersisted()
         scope.launch { speedSampler() }
@@ -339,7 +353,7 @@ object DownloadManager {
                     .url(task.url)
                     .header("User-Agent", USER_AGENT)
                 if (task.acceptRanges) requestBuilder.header("Range", "bytes=$from-${chunk.end}")
-                val call = client.newCall(requestBuilder.build())
+                val call = (if (task.useLenient) lenientClient else client).newCall(requestBuilder.build())
                 synchronized(task.lock) { task.calls.add(call) }
                 try {
                     call.execute().use { response ->
@@ -385,6 +399,8 @@ object DownloadManager {
             } catch (e: Exception) {
                 if (task.canceled.get() || task.paused.get() || task.error.get() != null) break
                 retries++
+                // خطای گواهی/DNS — تلاش بعدی با کلاینت تساهل‌گر
+                if (LenientTls.isTlsOrDnsError(e)) task.useLenient = true
                 if (retries >= MAX_RETRIES) {
                     task.error.compareAndSet(
                         null,
@@ -433,8 +449,9 @@ object DownloadManager {
 
     private fun probe(url: String): Probe {
         var lastError: Exception? = null
+        var httpClient = client
         try {
-            client.newCall(
+            httpClient.newCall(
                 Request.Builder().url(url).header("User-Agent", USER_AGENT).head().build()
             ).execute().use { resp ->
                 if (resp.isSuccessful) {
@@ -446,9 +463,11 @@ object DownloadManager {
             }
         } catch (e: Exception) {
             lastError = e
+            // خطای گواهی/DNS — ادامه با کلاینت تساهل‌گر
+            if (LenientTls.isTlsOrDnsError(e)) httpClient = lenientClient
         }
         try {
-            client.newCall(
+            httpClient.newCall(
                 Request.Builder().url(url)
                     .header("User-Agent", USER_AGENT)
                     .header("Range", "bytes=0-0")
@@ -659,6 +678,7 @@ object DownloadManager {
     ) {
         val lock = Any()
         val mutex = Mutex()
+        @Volatile var useLenient = false
         val generation = AtomicLong(0)
         val paused = AtomicBoolean(false)
         val canceled = AtomicBoolean(false)

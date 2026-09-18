@@ -2,6 +2,8 @@ package com.sakhand.downloadmanager.social
 
 import com.sakhand.downloadmanager.data.SocialPlatform
 import com.sakhand.downloadmanager.engine.DownloadManager
+import com.sakhand.downloadmanager.engine.LenientTls
+import com.sakhand.downloadmanager.engine.SmartDns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -60,7 +62,8 @@ object SocialResolver {
     private val bundledCobalt = listOf(
         "https://api.cobalt.liubquanti.click/",
         "https://co.otomir23.me/",
-        "https://dwnld.nichind.dev/"
+        "https://dwnld.nichind.dev/",
+        "https://nyc1.coapi.ggtyler.dev/"
     )
 
     private val bundledPiped = listOf(
@@ -83,15 +86,20 @@ object SocialResolver {
         "Instagram 195.0.0.31.123 Android (26/8.0.0; 480dpi; 1080x1920; OnePlus; OnePlus5T; op8t19; en_IN; 302733750)"
     private val IG_GRAPHQL_DOCS = listOf("8845758582119845", "10015901848480474")
 
+    /** پیام استاندارد شکست سطح اتصال — مبنای تشخیص نیاز به پاس نجات */
+    private const val CONNECTION_REASON = "ارتباط با سرور برقرار نشد"
+
     /** راهنمای فیلترشکن برای پیام‌های خطای نهایی */
     private const val HINT_VPN =
-        " اگر یوتیوب یا اینستاگرام را با فیلترشکن باز می‌کنی، فیلترشکن را روشن نگه دار و دوباره تلاش کن."
+        " اگر یوتیوب یا اینستاگرام را با فیلترشکن باز می‌کنی، فیلترشکن را روشن نگه دار و دوباره تلاش کن. " +
+        "اگر باز هم نشد، ساعت و تاریخ دستگاه را روی تنظیم خودکار بگذار و دوباره امتحان کن."
 
     /** کلاینت عمومی برای دریافت صفحات (پینترست) */
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
+        .dns(SmartDns)
         .build()
 
     /** کلاینت سریع برای سرورهای کوبالت/پایپد — شبکه‌های موبایل آهسته‌اند */
@@ -99,13 +107,27 @@ object SocialResolver {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(25, TimeUnit.SECONDS)
+        .dns(SmartDns)
         .build()
 
+    /** کلاینت نجات — مثل cobaltClient ولی خطای گواهی TLS را نادیده می‌گیرد؛
+     *  فقط وقتی همه سرورها در پاس اول شکست خوردند به‌کار می‌رود */
+    private val cobaltLenientClient: OkHttpClient by lazy {
+        LenientTls.apply(
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .callTimeout(25, TimeUnit.SECONDS)
+                .dns(SmartDns)
+                .build()
+        )
+    }
     /** کلاینت API اینستاگرام — زمان کمی بیشتر برای پاسخ‌های موبایل */
     private val igClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(18, TimeUnit.SECONDS)
         .callTimeout(25, TimeUnit.SECONDS)
+        .dns(SmartDns)
         .build()
 
     /** کلاینت Invidious — کوتاه چون چند سرور پشت‌سرهم امتحان می‌شوند */
@@ -113,6 +135,7 @@ object SocialResolver {
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .callTimeout(12, TimeUnit.SECONDS)
+        .dns(SmartDns)
         .build()
 
     /** کلاینت دریافت تنظیمات ریموت */
@@ -120,6 +143,7 @@ object SocialResolver {
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
         .callTimeout(8, TimeUnit.SECONDS)
+        .dns(SmartDns)
         .build()
 
     // ------------------------------------------------------------
@@ -236,7 +260,16 @@ object SocialResolver {
     private class RaceResult {
         val winner = AtomicReference<Attempt?>(null)
         val localProcessing = mutableListOf<String>()
+        private val reasons = mutableListOf<String>()
         @Volatile var lastReason: String? = null
+            private set
+        fun recordReason(reason: String) = synchronized(reasons) {
+            reasons.add(reason)
+            lastReason = reason
+        }
+        /** فقط شکست سطح اتصال؟ (یعنی DNS یا گواهی TLS مشکل دارد، نه خود سرور) */
+        val allConnectionFailures: Boolean
+            get() = synchronized(reasons) { reasons.isNotEmpty() && reasons.all { it == CONNECTION_REASON } }
         fun recordLocal(ep: String) = synchronized(localProcessing) { localProcessing.add(ep) }
     }
 
@@ -249,33 +282,46 @@ object SocialResolver {
         val endpoints = cobaltList()
         val q = if (audioOnly) "1080" else quality
 
-        // مرحله ۱: همه سرورها همزمان با کیفیت اصلی صدا زده می‌شوند
-        val race = RaceResult()
-        supervisorScope {
-            endpoints.map { ep ->
-                launch {
-                    val attempt = runCatching { callCobalt(ep, link, q, audioOnly, platform) }
-                        .getOrElse { Attempt(reason = "ارتباط با سرور برقرار نشد") }
-                    when {
-                        attempt.media != null -> race.winner.compareAndSet(null, attempt)
-                        attempt.localProcessing -> race.recordLocal(ep)
-                        else -> if (attempt.reason != null) race.lastReason = attempt.reason
+        suspend fun runRace(lenient: Boolean): RaceResult {
+            val race = RaceResult()
+            val httpClient = if (lenient) cobaltLenientClient else cobaltClient
+            supervisorScope {
+                endpoints.map { ep ->
+                    launch {
+                        val attempt = runCatching { callCobalt(httpClient, ep, link, q, audioOnly, platform) }
+                            .getOrElse { Attempt(reason = CONNECTION_REASON) }
+                        when {
+                            attempt.media != null -> race.winner.compareAndSet(null, attempt)
+                            attempt.localProcessing -> race.recordLocal(ep)
+                            else -> if (attempt.reason != null) race.recordReason(attempt.reason!!)
+                        }
                     }
                 }
             }
+            return race
         }
+
+        // مرحله ۱: همه سرورها همزمان با کیفیت اصلی صدا زده می‌شوند
+        val race = runRace(lenient = false)
 
         // مرحله ۲: اگر فقط سرورهای «پردازش محلی» جواب دادند، با 720 تک‌فایله امتحان کن
         var winner = race.winner.get()
         if (winner == null) {
             for (ep in race.localProcessing) {
-                val attempt = runCatching { callCobalt(ep, link, "720", audioOnly, platform) }
-                    .getOrElse { Attempt(reason = "ارتباط با سرور برقرار نشد") }
+                val attempt = runCatching { callCobalt(cobaltClient, ep, link, "720", audioOnly, platform) }
+                    .getOrElse { Attempt(reason = CONNECTION_REASON) }
                 if (attempt.media != null) {
                     winner = attempt
                     break
                 }
             }
+        }
+
+        // مرحله ۳: اگر همه در سطح اتصال شکست خوردند (DNS خراب یا گواهی TLS)،
+        // یک پاس دیگر با کلاینت تساهل‌گر امتحان می‌شود
+        if (winner == null && race.allConnectionFailures && endpoints.isNotEmpty()) {
+            val rescue = runRace(lenient = true)
+            winner = rescue.winner.get()
         }
 
         if (winner?.media != null) return@withContext winner.media
@@ -284,11 +330,13 @@ object SocialResolver {
             " سرورهای عمومی محدود شده‌اند — می‌توانی طبق README یک سرور شخصی بسازی."
         } else ""
         throw SocialException(
-            "دانلود از ${platform.label} ناموفق بود — ${race.lastReason ?: "هیچ سروری پاسخ نداد"}$hint"
+            "دانلود از ${platform.label} ناموفق بود — ${race.lastReason ?: "هیچ سروری پاسخ نداد"} " +
+                "(${endpoints.size} سرور امتحان شد)$hint"
         )
     }
 
     private fun callCobalt(
+        httpClient: OkHttpClient,
         endpoint: String,
         link: String,
         quality: String,
@@ -313,7 +361,7 @@ object SocialResolver {
         }
 
         return try {
-            cobaltClient.newCall(builder.build()).execute().use { resp ->
+            httpClient.newCall(builder.build()).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (text.isBlank()) return Attempt(reason = "پاسخ خالی از سرور")
                 val json = try {
@@ -372,7 +420,7 @@ object SocialResolver {
                 }
             }
         } catch (e: Exception) {
-            Attempt(reason = "ارتباط با سرور برقرار نشد")
+            Attempt(reason = CONNECTION_REASON)
         }
     }
 

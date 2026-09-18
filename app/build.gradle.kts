@@ -12,8 +12,8 @@ android {
         applicationId = "com.sakhand.downloadmanager"
         minSdk = 26          // اندروید ۸ به بالا
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "1.7"
     }
 
     signingConfigs {
@@ -66,6 +66,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.1")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
